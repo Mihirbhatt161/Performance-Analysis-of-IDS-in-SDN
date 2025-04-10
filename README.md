@@ -29,4 +29,4 @@ We used **CICIDS2019**, a well-known intrusion detection dataset that contains b
 
 If running on Kaggle, simply upload the dataset and update the path in the notebook accordingly:
 ```python
-file_path = "/kaggle/input/your-dataset-folder/file.csv"
+file_path = ""/kaggle/input/cicids2019/UDPLag_data_2_0_per.csv""
