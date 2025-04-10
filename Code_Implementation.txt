@@ -1,0 +1,66 @@
+# Import necessary libraries
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Step 1: Generate Synthetic Traffic Data
+np.random.seed(42)
+
+# Create synthetic features: normal traffic and attack traffic
+num_samples = 1000
+features = np.random.rand(num_samples, 4)  # 4 traffic-related features
+labels = np.random.choice([0, 1], size=num_samples, p=[0.8, 0.2])  # 80% normal, 20% attacks
+
+# Convert to a DataFrame
+data = pd.DataFrame(features, columns=["Feature1", "Feature2", "Feature3", "Feature4"])
+data["Label"] = labels
+
+# Display the first few rows of the dataset
+print("Dataset Sample:")
+print(data.head())
+
+# Step 2: Split the Data into Training and Testing Sets
+X = data.drop("Label", axis=1)
+y = data["Label"]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+# Step 3: Train a Logistic Regression Model for Intrusion Detection
+model = LogisticRegression()
+model.fit(X_train, y_train)
+
+# Step 4: Make Predictions and Evaluate the Model
+y_pred = model.predict(X_test)
+
+# Print performance metrics
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+
+print("\nConfusion Matrix:")
+cm = confusion_matrix(y_test, y_pred)
+print(cm)
+
+# Step 5: Visualize the Results
+# Plot confusion matrix
+plt.figure(figsize=(6, 5))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=["Normal", "Attack"], yticklabels=["Normal", "Attack"])
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.title("Confusion Matrix")
+plt.show()
+
+# Step 6: Accuracy of the Model
+accuracy = accuracy_score(y_test, y_pred)
+print(f"\nModel Accuracy: {accuracy * 100:.2f}%")
+
+# Step 7: Traffic Visualization
+plt.figure(figsize=(8, 5))
+sns.countplot(x="Label", data=data)
+plt.title("Distribution of Normal vs Attack Traffic")
+plt.xlabel("Traffic Type (0 = Normal, 1 = Attack)")
+plt.ylabel("Count")
+plt.show()
