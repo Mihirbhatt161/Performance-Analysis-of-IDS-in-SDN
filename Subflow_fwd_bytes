@@ -1,0 +1,166 @@
+# ============================================================
+# SDN Traffic Prediction using Random Forest Regressor
+# Target: Subflow Fwd Bytes
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import warnings
+warnings.filterwarnings("ignore")
+
+# ML
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+# Visualization
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# ============================================================
+# 1. LOAD DATASET
+# ============================================================
+
+file_path = "/kaggle/input/udpdataset/UDPLag_data_2_0_per.csv"
+df = pd.read_csv(file_path)
+
+print("Initial dataset shape:", df.shape)
+
+# ============================================================
+# 2. DROP NON-NUMERIC / IRRELEVANT COLUMNS
+# ============================================================
+
+drop_cols = [
+    'Unnamed: 0',
+    'Flow ID',
+    ' Source IP',
+    ' Destination IP',
+    ' Timestamp'
+]
+
+df.drop(columns=[c for c in drop_cols if c in df.columns], inplace=True)
+
+# ============================================================
+# 3. DATA CLEANING
+# ============================================================
+
+df.replace([np.inf, -np.inf], np.nan, inplace=True)
+df.dropna(inplace=True)
+
+print("Dataset shape after cleaning:", df.shape)
+
+# ============================================================
+# 4. FEATURE / TARGET SPLIT
+# ============================================================
+
+target_col = ' Subflow Fwd Bytes' if ' Subflow Fwd Bytes' in df.columns else 'Subflow Fwd Bytes'
+
+X = df.drop(columns=[target_col])
+y = df[target_col]
+
+# Use numeric features only
+X = X.select_dtypes(include=[np.number])
+
+print("Target column:", target_col)
+print("Number of features:", X.shape[1])
+
+# ============================================================
+# 5. FEATURE SCALING
+# ============================================================
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# ============================================================
+# 6. TRAIN-TEST SPLIT
+# ============================================================
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled,
+    y,
+    test_size=0.25,
+    random_state=42
+)
+
+# ============================================================
+# 7. RANDOM FOREST REGRESSOR
+# ============================================================
+
+rf_model = RandomForestRegressor(
+    n_estimators=200,
+    max_depth=None,
+    min_samples_split=2,
+    min_samples_leaf=1,
+    n_jobs=-1,
+    random_state=42
+)
+
+print("\nTraining Random Forest Regressor...")
+rf_model.fit(X_train, y_train)
+
+# ============================================================
+# 8. PREDICTION
+# ============================================================
+
+y_pred = rf_model.predict(X_test)
+
+# ============================================================
+# 9. REGRESSION EVALUATION
+# ============================================================
+
+mae  = mean_absolute_error(y_test, y_pred)
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+r2   = r2_score(y_test, y_pred)
+
+print("\n============= REGRESSION PERFORMANCE =============")
+print(f"MAE  : {mae:.2f}")
+print(f"RMSE : {rmse:.2f}")
+print(f"R²   : {r2:.4f}")
+
+# ============================================================
+# 10. PREDICTED vs ACTUAL PLOT
+# ============================================================
+
+plt.figure(figsize=(6,6))
+plt.scatter(y_test, y_pred, alpha=0.4)
+plt.xlabel("Actual Subflow Fwd Bytes")
+plt.ylabel("Predicted Subflow Fwd Bytes")
+plt.title("Actual vs Predicted Traffic Volume")
+plt.show()
+
+# ============================================================
+# 11. FEATURE IMPORTANCE
+# ============================================================
+
+feature_importance = pd.DataFrame({
+    'Feature': X.columns,
+    'Importance': rf_model.feature_importances_
+}).sort_values(by='Importance', ascending=False)
+
+print("\nTop 10 Important Features:")
+print(feature_importance.head(10))
+
+# ============================================================
+# 12. REAL-TIME TRAFFIC PREDICTION FUNCTION
+# ============================================================
+
+def predict_subflow_fwd_bytes(flow_features):
+    """
+    Predict Subflow Fwd Bytes for a single flow
+    """
+    flow_features = np.array(flow_features).reshape(1, -1)
+    flow_features = scaler.transform(flow_features)
+    return rf_model.predict(flow_features)[0]
+
+# ============================================================
+# 13. SAMPLE REAL-TIME TEST
+# ============================================================
+
+sample_flow = X.iloc[0].values
+print("\nPredicted Subflow Fwd Bytes:",
+      predict_subflow_fwd_bytes(sample_flow))
+
+# ============================================================
+# END
+# ============================================================
