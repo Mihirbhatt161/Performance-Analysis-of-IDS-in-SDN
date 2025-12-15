@@ -1,0 +1,194 @@
+# ============================================================
+# Intrusion Detection using Random Forest Classification
+# Target: Inbound (0 = BENIGN, 1 = UDP Attack)
+# Dataset: CICIDS-2019 (UDPLag)
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import warnings
+warnings.filterwarnings("ignore")
+
+# ML
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    classification_report,
+    confusion_matrix
+)
+
+# Visualization
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# ============================================================
+# 1. LOAD DATASET
+# ============================================================
+
+file_path = "/kaggle/input/udpdataset/UDPLag_data_2_0_per.csv"
+df = pd.read_csv(file_path)
+
+print("Initial dataset shape:", df.shape)
+
+# ============================================================
+# 2. DROP NON-NUMERIC / IDENTIFIER COLUMNS
+# ============================================================
+
+drop_cols = [
+    'Unnamed: 0',
+    'Flow ID',
+    ' Source IP',
+    ' Destination IP',
+    ' Timestamp'
+]
+
+df.drop(columns=[c for c in drop_cols if c in df.columns], inplace=True)
+
+# ============================================================
+# 3. DATA CLEANING
+# ============================================================
+
+df.replace([np.inf, -np.inf], np.nan, inplace=True)
+df.dropna(inplace=True)
+
+print("Dataset shape after cleaning:", df.shape)
+
+# ============================================================
+# 4. DEFINE TARGET AND FEATURES
+# ============================================================
+
+target_col = ' Inbound' if ' Inbound' in df.columns else 'Inbound'
+
+X = df.drop(columns=[target_col])
+y = df[target_col]
+
+# Use numeric features only
+X = X.select_dtypes(include=[np.number])
+
+print("Target column:", target_col)
+print("Number of features:", X.shape[1])
+
+# ============================================================
+# 5. FEATURE SCALING
+# ============================================================
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# ============================================================
+# 6. TRAIN-TEST SPLIT
+# ============================================================
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled,
+    y,
+    test_size=0.25,
+    random_state=42,
+    stratify=y
+)
+
+# ============================================================
+# 7. RANDOM FOREST CLASSIFIER
+# ============================================================
+
+rf_model = RandomForestClassifier(
+    n_estimators=200,
+    max_depth=None,
+    min_samples_split=2,
+    min_samples_leaf=1,
+    n_jobs=-1,
+    random_state=42
+)
+
+print("\nTraining Random Forest Classifier...")
+rf_model.fit(X_train, y_train)
+
+# ============================================================
+# 8. PREDICTION
+# ============================================================
+
+y_pred = rf_model.predict(X_test)
+
+# ============================================================
+# 9. MODEL EVALUATION
+# ============================================================
+
+accuracy  = accuracy_score(y_test, y_pred)
+precision = precision_score(y_test, y_pred)
+recall    = recall_score(y_test, y_pred)
+f1        = f1_score(y_test, y_pred)
+
+print("\n================ IDS PERFORMANCE =================")
+print(f"Accuracy  : {accuracy:.4f}")
+print(f"Precision : {precision:.4f}")
+print(f"Recall    : {recall:.4f}")
+print(f"F1-score  : {f1:.4f}")
+
+print("\nClassification Report:\n")
+print(classification_report(
+    y_test,
+    y_pred,
+    target_names=['BENIGN', 'UDP Attack']
+))
+
+# ============================================================
+# 10. CONFUSION MATRIX
+# ============================================================
+
+cm = confusion_matrix(y_test, y_pred)
+
+plt.figure(figsize=(6, 5))
+sns.heatmap(
+    cm,
+    annot=True,
+    fmt='d',
+    cmap='Blues',
+    xticklabels=['BENIGN', 'UDP Attack'],
+    yticklabels=['BENIGN', 'UDP Attack']
+)
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.title("Confusion Matrix – UDP Attack Detection")
+plt.show()
+
+# ============================================================
+# 11. FEATURE IMPORTANCE
+# ============================================================
+
+feature_importance = pd.DataFrame({
+    'Feature': X.columns,
+    'Importance': rf_model.feature_importances_
+}).sort_values(by='Importance', ascending=False)
+
+print("\nTop 10 Important Features:")
+print(feature_importance.head(10))
+
+# ============================================================
+# 12. REAL-TIME IDS PREDICTION FUNCTION
+# ============================================================
+
+def predict_udp_attack(flow_features):
+    """
+    Predict whether traffic is BENIGN or UDP Attack
+    """
+    flow_features = np.array(flow_features).reshape(1, -1)
+    flow_features = scaler.transform(flow_features)
+    prediction = rf_model.predict(flow_features)[0]
+    return "UDP Attack" if prediction == 1 else "BENIGN"
+
+# ============================================================
+# 13. SAMPLE REAL-TIME TEST
+# ============================================================
+
+sample_flow = X.iloc[0].values
+print("\nReal-time IDS prediction:",
+      predict_udp_attack(sample_flow))
+
+# ============================================================
+# END
+# ============================================================
